@@ -1,0 +1,141 @@
+---
+title: "MidtermProject"
+output: html_document
+date: "2023-10-16"
+---
+
+## Step 1 - Read in data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+clinData <- read.table(file = "input/Blalock_clin_final.csv",
+                       sep=",", 
+                       header = T, 
+                       stringsAsFactors = F, row.names = NULL)
+
+geneExp <- read.table(file = "input/GSE62232_Blalock_geneexp_final.tsv",
+                      sep="\t",
+                      row.names = 1,
+                      header = T, 
+                      stringsAsFactors = F)
+```
+
+## Step 2 - Clean/Filter data
+
+```{r}
+dim(clinData)
+```
+
+# Filter gene expression data (not needed)
+- Columns are samples/patients
+- Rows are molecular features (gene expression)
+```{r}
+dim(geneExp)
+```
+
+```{r}
+matchingSamples <- which(colnames(geneExp) %in% clinData$BIOSPECIMEN_ID) # 30 IDs matching
+subsetGeneExp <- geneExp[, matchingSamples] ##  43135 rows features, 30 patient columns
+```
+
+## Step 3 - Identify the groups to be compared (Baseline and Comparision Groups)
+
+```{r}
+baselineGrpLabels <-  which(clinData$DISEASE_STATUS == "Control") #8 samples
+head(baselineGrpLabels)
+# Labels (row numbers) that can identify the baseline group patients
+# Use the labels (row numbers) to subset baseline patients in clinical data file 
+clinBase <- clinData[baselineGrpLabels, ]
+
+# Labels (row numbers) that can identify the comp group patients
+compGrpLabels <- which(clinData$DISEASE_STATUS == "Severe") #7 samples
+head(compGrpLabels)
+# Use the labels (row numbers) to subset comp patients in clinical data file 
+clinComp <- clinData[compGrpLabels, ]
+
+#### Use the clinBase and clinComp objects to subset gene expression data
+geneExpTumorBase <- subsetGeneExp[, clinBase$BIOSPECIMEN_ID] # 43135 feature (rows), 8 samples columns
+geneExpTumorComp <- subsetGeneExp[, clinComp$BIOSPECIMEN_ID] # 43135 feature (rows), 7 samples columns
+```
+
+## Step 4: Sanity check
+
+```{r}
+#See if sample ids in clinical data match sample ids in gene exp data
+clinBase$BIOSPECIMEN_ID == colnames(geneExpTumorBase)
+clinComp$BIOSPECIMEN_ID == colnames(geneExpTumorComp)
+```
+
+## Step 5 - Prep data for T-test. Call function for T-test. Calculate fold change, q-value, sort by p-value, export results as csv
+
+```{r}
+### Checking to make sure data is a numeric data frame
+knitr::kable(head(geneExpTumorBase[1:5,1:4]))
+knitr::kable(head(geneExpTumorComp[1:5,1:4]))
+```
+
+#### Function for T-test
+
+```{r ttest}
+source("fnTTest.R")
+
+#### Call T-test function
+results1 = fnTTest(baseGroup = geneExpTumorBase, 
+                   compGroup = geneExpTumorComp, 
+                   testName = "TTest", 
+                   baseGroupName = "Control",
+                   compGroupName =  "Severe",
+                   folderName = "output")
+```
+
+# Read in the T-Test results file
+```{r}
+#Read in the T-Test results file
+ttestResults <- read.csv(file = "output/TTest_Severe_(Comp).vs._Control_(Base).TTest.csv")
+
+#check to make sure p-value column is imported as numeric 
+#sort by p-value (just in case the results are not sorted by p-value)
+ttestResultsSorted <- dplyr::arrange(ttestResults, Pvalue)
+
+#find rows with p-value < 0.01
+whichSig <- which(ttestResultsSorted$Pvalue <= 0.01) 
+
+#Short list sig results
+ttestResultsSig <- ttestResultsSorted[whichSig, ] #631 rows 
+
+
+##### First column is a list of features in this format : ProbeID|GeneName. 
+#### Use string split strsplit() function to extract gene names
+funcSplit <- function(featureX) {
+  f1 <- unlist(strsplit(x = featureX, split = "|", fixed = TRUE))
+  f2 <- f1[2]
+  return(f2)
+}
+
+# Use apply() function to run the split on every row, its faster version of a loop
+geneNames1 <- apply(X = as.matrix(ttestResultsSig$Feature), 
+                    MARGIN = 1, FUN = funcSplit)
+
+head(geneNames1)
+
+
+#print length of short listed gene names
+length(geneNames1)
+
+### Export short listed results
+write.table(x = ttestResultsSig, 
+            file = "output/Alzheiemers_Severe_Ttest_Shortlisted.csv",
+            quote = F, sep = "\t")
+
+### Export list of gene names
+write.table(x = geneNames1, 
+            file = "output/AlzheimersSevere_SigDiffExpressedGenes.csv", 
+            quote = F, sep = "\t")
+
+# A text document that contains the Top 20 Differentially Expressed Genes
+write.table(ttestResultsSig$Feature[1:20], 
+            file = "output/YukthaPenumala-TTest-Midterm-Top20Genes.tsv", 
+            quote = F, sep = "\t")
+```
