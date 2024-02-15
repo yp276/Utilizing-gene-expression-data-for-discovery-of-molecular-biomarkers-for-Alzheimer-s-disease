@@ -7,7 +7,7 @@ Introduction:
 Alzheimer's disease (AD) is a progressive and degenerative brain disorder, characterized by distinct stages. The last stage or severe stage, which impacts one’s life the most, is characterized by severe cognitive decline, loss of motor skills, and an increased need for full-time care. Individuals may be nonverbal, unable to recognize loved ones, and experience significant memory loss. They may require assistance with all aspects of daily living.
 
 Steps:
-1) Conducted differential gene expression analysis (in R) to generrate differentiallly expressed genes (DEGs) between groups of subjects at severe stage of AD vs. normal control.
+1) Conducted differential gene expression analysis (in R) to generate differentiallly expressed genes (DEGs) between groups of subjects at severe stage of AD vs. normal control.
   - Ran T-test to obtain set of DEGs
 
 2) Conducted a systems biology level analysis of the list of DEGs (generated in step 1 and filtered on p-value <=0.01)
